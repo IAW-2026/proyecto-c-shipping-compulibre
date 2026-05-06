@@ -1,65 +1,74 @@
-import Image from "next/image";
+"use client";
+import { useState } from 'react';
 
-export default function Home() {
+export default function TrackingPage() {
+  const [trackingId, setTrackingId] = useState('');
+  const [shipment, setShipment] = useState<any>(null);
+  const [error, setError] = useState('');
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // En producción, esto llamaría a tu API interna conectada a la base de datos
+    // Ej: const res = await fetch(`/api/shipments/${trackingId}`);
+    
+    // Mock de datos para la UI
+    if (trackingId === "TRK-COMPU-9999") {
+      setShipment({
+        tracking_id: "TRK-COMPU-9999",
+        courier: "Andreani",
+        status: "DELIVERED",
+        destination_address: "Av. Siempreviva 742, Springfield"
+      });
+      setError('');
+    } else {
+      setError('Envío no encontrado');
+      setShipment(null);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-gray-50 flex flex-col items-center p-8">
+      <h1 className="text-3xl font-bold mb-8 text-[#0083bb]">CompuLibre - Seguimiento Logístico</h1>
+      
+      <form onSubmit={handleSearch} className="w-full max-w-md bg-white p-6 rounded shadow-md mb-8">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Número de Tracking</label>
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={trackingId}
+            onChange={(e) => setTrackingId(e.target.value)}
+            className="flex-1 border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#0083bb]"
+            placeholder="Ej: TRK-COMPU-9999"
+          />
+          <button type="submit" className="bg-[#0083bb] text-white px-4 py-2 rounded hover:bg-blue-700">
+            Buscar
+          </button>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        {error && <p className="text-[#e6538a] mt-2 text-sm font-semibold">{error}</p>}
+      </form>
+
+      {shipment && (
+        <div className="w-full max-w-md bg-white p-6 rounded shadow-md border-l-4 border-[#0083bb]">
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">Detalles del Paquete</h2>
+          <div className="space-y-3">
+            <p><strong>Tracking:</strong> {shipment.tracking_id}</p>
+            <p><strong>Operador Logístico:</strong> {shipment.courier}</p>
+            <p><strong>Destino:</strong> {shipment.destination_address}</p>
+            
+            <div className="mt-4 p-4 rounded text-center font-bold text-lg text-white" 
+                 style={{
+                   backgroundColor: shipment.status === 'DELIVERED' ? '#10b981' : 
+                                    shipment.status === 'IN_TRANSIT' ? '#fc7f40' : '#0083bb',
+                   backgroundImage: shipment.status === 'DELIVERED' ? 'repeating-conic-gradient(#000 0% 25%, #fff 0% 50%)' : 'none',
+                   backgroundSize: shipment.status === 'DELIVERED' ? '20px 20px' : 'auto',
+                   color: shipment.status === 'DELIVERED' ? '#fff' : '#fff',
+                   textShadow: shipment.status === 'DELIVERED' ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                 }}>
+              ESTADO: {shipment.status.replace('_', ' ')}
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }
