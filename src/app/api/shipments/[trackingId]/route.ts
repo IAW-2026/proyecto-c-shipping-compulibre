@@ -1,28 +1,182 @@
-// app/api/shipments/[trackingId]/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { ShipmentStatus } from "@prisma/client";
 
+const STATUS_ORDER: ShipmentStatus[] = [
+  ShipmentStatus.LABEL_CREATED,
+  ShipmentStatus.IN_TRANSIT,
+  ShipmentStatus.DELIVERED,
+];
+
+function nextStatus(current: ShipmentStatus): ShipmentStatus | null {
+  const idx = STATUS_ORDER.indexOf(current);
+
+  return idx < STATUS_ORDER.length - 1
+    ? STATUS_ORDER[idx + 1]
+    : null;
+}
+
+// GET /api/shipments/[trackingId]
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ trackingId: string }> }
 ) {
-  const { trackingId } = await params
+  const { trackingId } = await params;
 
-  const shipment = await prisma.shipment.findUnique({
-    where: { trackingId },
-    include: {
-      events: {
-        orderBy: { timestamp: 'asc' },
+  try {
+    const shipment = await prisma.shipment.findUnique({
+      where: { trackingId },
+      include: {
+        events: {
+          orderBy: { timestamp: "asc" },
+        },
       },
-    },
-  })
+    });
 
-  if (!shipment) {
+    if (!shipment) {
+      return NextResponse.json(
+        { error: "Shipment not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(shipment);
+  } catch (error) {
+    console.error("[GET /api/shipments/:trackingId]", error);
+
     return NextResponse.json(
-      { error: 'Envío no encontrado' },
-      { status: 404 }
-    )
+      { error: "Failed to fetch shipment" },
+      { status: 500 }
+    );
   }
+}
 
-  return NextResponse.json(shipment)
+// DELETE /api/shipments/[trackingId]
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ trackingId: string }> }
+) {
+  const { trackingId } = await params;
+
+  try {
+    await prisma.shipment.delete({
+      where: { trackingId },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[DELETE /api/shipments/:trackingId]", error);
+
+    return NextResponse.json(
+      { error: "Failed to delete shipment" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/shipments/[trackingId]
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ trackingId: string }> }
+) {
+  const { trackingId } = await params;
+
+  try {
+    const body = await req.json().catch(() => ({}));
+
+    const location: string =
+      body.location ?? "In transit";
+
+    const shipment = await prisma.shipment.findUnique({
+      where: { trackingId },
+    });
+
+    if (!shipment) {
+      return NextResponse.json(
+        { error: "Shipment not found" },
+        { status: 404 }
+      );
+    }
+
+    const newStatus = nextStatus(shipment.status);
+
+    if (!newStatus) {
+      return NextResponse.json(
+        {
+          error:
+            "Shipment is already in its final status (DELIVERED)",
+        },
+        { status: 400 }
+      );
+    }
+
+    const updated = await prisma.shipment.update({
+      where: { trackingId },
+      data: {
+        status: newStatus,
+        events: {
+          create: {
+            statusUpdate: newStatus,
+            location,
+          },
+        },
+      },
+      include: {
+        events: {
+          orderBy: { timestamp: "asc" },
+        },
+      },
+    });
+
+    const webhookPayload = {
+      trackingId,
+      courier: shipment.courier,
+      status: newStatus,
+    };
+
+    const buyerOrderId =
+      body.buyerOrderId as string | undefined;
+
+    const sellerOrderId =
+      shipment.externalSellerOrderId;
+
+    if (buyerOrderId && process.env.BUYER_APP_URL) {
+      fetch(
+        `${process.env.BUYER_APP_URL}/api/orders/${buyerOrderId}/shipping-webhook`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(webhookPayload),
+        }
+      ).catch((e) =>
+        console.warn("[Webhook → BuyerApp]", e)
+      );
+    }
+
+    if (sellerOrderId && process.env.SELLER_APP_URL) {
+      fetch(
+        `${process.env.SELLER_APP_URL}/api/seller-orders/${sellerOrderId}/shipping-webhook`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(webhookPayload),
+        }
+      ).catch((e) =>
+        console.warn("[Webhook → SellerApp]", e)
+      );
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("[PATCH /api/shipments/:trackingId]", error);
+
+    return NextResponse.json(
+      { error: "Failed to update shipment status" },
+      { status: 500 }
+    );
+  }
 }
