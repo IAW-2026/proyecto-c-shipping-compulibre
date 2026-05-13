@@ -1,8 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
 // Routes that require authentication
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
