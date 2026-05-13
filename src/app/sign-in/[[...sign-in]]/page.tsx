@@ -50,7 +50,7 @@ export default function SignInPage() {
         routing="path"
         path="/sign-in"
         signUpUrl={undefined}          // disable self-registration
-        afterSignInUrl="/admin/shipments"
+        fallbackRedirectUrl="/admin/shipments"
         appearance={{
           variables: {
             colorPrimary: "#3b82f6",
