@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Unused sellerId is accepted (sent by Payments App per the API contract)
+    // Se acepta sellerId sin usar (enviado por Payments App) para mantener compatibilidad, 
+    // pero no se utiliza en este servicio
     void sellerId;
 
     const trackingId = generateTrackingId();

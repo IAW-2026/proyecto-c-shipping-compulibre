@@ -134,15 +134,12 @@ export async function PATCH(
       status: newStatus,
     };
 
-    const buyerOrderId =
-      body.buyerOrderId as string | undefined;
-
-    const sellerOrderId =
+    const OrderId =
       shipment.externalSellerOrderId;
 
-    if (buyerOrderId && process.env.BUYER_APP_URL) {
+    if (OrderId && process.env.BUYER_APP_URL) {
       fetch(
-        `${process.env.BUYER_APP_URL}/api/orders/${buyerOrderId}/shipping-webhook`,
+        `${process.env.BUYER_APP_URL}/api/orders/${OrderId}/shipping-webhook`,
         {
           method: "POST",
           headers: {
@@ -152,21 +149,6 @@ export async function PATCH(
         }
       ).catch((e) =>
         console.warn("[Webhook → BuyerApp]", e)
-      );
-    }
-
-    if (sellerOrderId && process.env.SELLER_APP_URL) {
-      fetch(
-        `${process.env.SELLER_APP_URL}/api/seller-orders/${sellerOrderId}/shipping-webhook`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(webhookPayload),
-        }
-      ).catch((e) =>
-        console.warn("[Webhook → SellerApp]", e)
       );
     }
 
