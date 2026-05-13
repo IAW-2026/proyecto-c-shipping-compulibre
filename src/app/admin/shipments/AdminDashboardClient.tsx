@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -576,7 +577,15 @@ function CreateModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function AdminDashboardPage() {
+export default function AdminDashboardClient({ displayName }: { displayName: string }) {
+  const { signOut } = useAuth();
+
+  // Sync AdminProfile row on first login (per 05-usuarios.md)
+  useEffect(() => {
+    fetch("/api/admin/sync-profile", { method: "POST" }).catch(() => {
+      // Non-critical: profile sync failure doesn't block the dashboard
+    });
+  }, []);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -747,22 +756,49 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
-            <div
-              style={{
-                background: "#1e293b",
-                border: "1px solid #334155",
-                borderRadius: 20,
-                padding: "4px 14px",
-                fontSize: 11,
-                color: "#94a3b8",
-                fontFamily: "var(--font-mono)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
-              SUPERADMIN
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  background: "#1e293b",
+                  border: "1px solid #334155",
+                  borderRadius: 20,
+                  padding: "4px 14px",
+                  fontSize: 11,
+                  color: "#94a3b8",
+                  fontFamily: "var(--font-mono)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+                {displayName.toUpperCase()}
+              </div>
+              <button
+                onClick={() => signOut({ redirectUrl: "/sign-in" })}
+                style={{
+                  background: "transparent",
+                  border: "1px solid #334155",
+                  color: "#64748b",
+                  padding: "4px 12px",
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.06em",
+                  transition: "color 0.15s, border-color 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.color = "#f87171";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#7f1d1d";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.color = "#64748b";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "#334155";
+                }}
+              >
+                SIGN OUT
+              </button>
             </div>
           </div>
         </div>
