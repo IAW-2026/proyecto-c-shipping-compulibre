@@ -1,181 +1,145 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ShipmentStatus } from "@prisma/client";
+import { fireShippingWebhooks, ShipmentStatus } from "@/lib/webhooks";
 
-const STATUS_ORDER: ShipmentStatus[] = [
-  ShipmentStatus.LABEL_CREATED,
-  ShipmentStatus.IN_TRANSIT,
-  ShipmentStatus.DELIVERED,
-];
+const NEXT_STATUS: Partial<Record<ShipmentStatus, ShipmentStatus>> = {
+  LABEL_CREATED: "IN_TRANSIT",
+  IN_TRANSIT: "DELIVERED",
+};
 
-function nextStatus(current: ShipmentStatus): ShipmentStatus | null {
-  const idx = STATUS_ORDER.indexOf(current);
+// ── GET /api/shipments/[trackingId] ───────────────────────────────────────────
 
-  return idx < STATUS_ORDER.length - 1
-    ? STATUS_ORDER[idx + 1]
-    : null;
-}
-
-// GET /api/shipments/[trackingId]
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ trackingId: string }> }
 ) {
   const { trackingId } = await params;
-
   try {
     const shipment = await prisma.shipment.findUnique({
       where: { trackingId },
-      include: {
-        events: {
-          orderBy: { timestamp: "asc" },
-        },
-      },
+      include: { events: { orderBy: { timestamp: "asc" } } },
     });
 
     if (!shipment) {
       return NextResponse.json(
-        { error: "Shipment not found" },
+        { error: "Shipment not found." },
         { status: 404 }
       );
     }
 
     return NextResponse.json(shipment);
   } catch (error) {
-    console.error("[GET /api/shipments/:trackingId]", error);
-
+    console.error("[GET /api/shipments/:id]", error);
     return NextResponse.json(
-      { error: "Failed to fetch shipment" },
+      { error: "Failed to fetch shipment." },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/shipments/[trackingId]
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ trackingId: string }> }
-) {
-  const { trackingId } = await params;
-
-  try {
-    await prisma.shipment.delete({
-      where: { trackingId },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[DELETE /api/shipments/:trackingId]", error);
-
-    return NextResponse.json(
-      { error: "Failed to delete shipment" },
-      { status: 500 }
-    );
-  }
-}
-
-// PATCH /api/shipments/[trackingId]
+// ── PATCH /api/shipments/[trackingId] ─────────────────────────────────────────
+// Advances the status one step forward only (LABEL_CREATED → IN_TRANSIT → DELIVERED).
+// Fires webhooks to Buyer App and Seller App after the DB update.
+//
+// Body: { location: string }
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ trackingId: string }> }
 ) {
   const { trackingId } = await params;
-
   try {
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json();
+    const { location } = body;
 
-    const location: string =
-      body.location ?? "In transit";
+    if (!location) {
+      return NextResponse.json(
+        { error: "location is required." },
+        { status: 400 }
+      );
+    }
 
-    const shipment = await prisma.shipment.findUnique({
+    const existing = await prisma.shipment.findUnique({
       where: { trackingId },
     });
 
-    if (!shipment) {
+    if (!existing) {
       return NextResponse.json(
-        { error: "Shipment not found" },
+        { error: "Shipment not found." },
         { status: 404 }
       );
     }
 
-    const newStatus = nextStatus(shipment.status);
+    const nextStatus = NEXT_STATUS[existing.status as ShipmentStatus];
 
-    if (!newStatus) {
+    if (!nextStatus) {
       return NextResponse.json(
         {
           error:
-            "Shipment is already in its final status (DELIVERED)",
+            "Shipment is already in its final status (DELIVERED). Status cannot go backwards.",
         },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
     const updated = await prisma.shipment.update({
       where: { trackingId },
       data: {
-        status: newStatus,
+        status: nextStatus,
         events: {
           create: {
-            statusUpdate: newStatus,
+            statusUpdate: nextStatus,
             location,
           },
         },
       },
-      include: {
-        events: {
-          orderBy: { timestamp: "asc" },
-        },
-      },
+      include: { events: { orderBy: { timestamp: "asc" } } },
     });
 
-    const webhookPayload = {
-      trackingId,
-      courier: shipment.courier,
-      status: newStatus,
-    };
-
-    const buyerOrderId =
-      body.buyerOrderId as string | undefined;
-
-    const sellerOrderId =
-      shipment.externalSellerOrderId;
-
-    if (buyerOrderId && process.env.BUYER_APP_URL) {
-      fetch(
-        `${process.env.BUYER_APP_URL}/api/orders/${buyerOrderId}/shipping-webhook`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(webhookPayload),
-        }
-      ).catch((e) =>
-        console.warn("[Webhook → BuyerApp]", e)
-      );
-    }
-
-    if (sellerOrderId && process.env.SELLER_APP_URL) {
-      fetch(
-        `${process.env.SELLER_APP_URL}/api/seller-orders/${sellerOrderId}/shipping-webhook`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(webhookPayload),
-        }
-      ).catch((e) =>
-        console.warn("[Webhook → SellerApp]", e)
-      );
-    }
+    // Fire webhooks to Buyer App and Seller App — non-blocking.
+    // Both apps are keyed by sellerOrderId (Buyer App knows it from the order flow).
+    fireShippingWebhooks(updated.externalSellerOrderId, {
+      trackingId: updated.trackingId,
+      courier: updated.courier,
+      status: nextStatus,
+    });
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("[PATCH /api/shipments/:trackingId]", error);
-
+    console.error("[PATCH /api/shipments/:id]", error);
     return NextResponse.json(
-      { error: "Failed to update shipment status" },
+      { error: "Failed to advance shipment status." },
+      { status: 500 }
+    );
+  }
+}
+
+// ── DELETE /api/shipments/[trackingId] ────────────────────────────────────────
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ trackingId: string }> }
+) {
+  const { trackingId } = await params;
+  try {
+    const existing = await prisma.shipment.findUnique({
+      where: { trackingId },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Shipment not found." },
+        { status: 404 }
+      );
+    }
+
+    // ShipmentEvents are cascade-deleted by the schema (onDelete: Cascade)
+    await prisma.shipment.delete({ where: { trackingId } });
+
+    return NextResponse.json({ success: true, trackingId });
+  } catch (error) {
+    console.error("[DELETE /api/shipments/:id]", error);
+    return NextResponse.json(
+      { error: "Failed to delete shipment." },
       { status: 500 }
     );
   }
