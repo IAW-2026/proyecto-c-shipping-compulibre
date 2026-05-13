@@ -1,13 +1,14 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 // Routes that require authentication
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isAdminRoute(req)) return; // public routes pass through
   const { userId, sessionClaims } = await auth();
-  console.log(JSON.stringify(sessionClaims, null, 2));
 
   // 1. Not signed in at all → redirect to Clerk's hosted sign-in
   if (!userId) {
