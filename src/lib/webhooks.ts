@@ -6,12 +6,13 @@ export interface ShippingWebhookPayload {
   status: ShipmentStatus;
 }
 
+const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
+const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
+
 export async function fireShippingWebhooks(
   sellerOrderId: string,
   payload: ShippingWebhookPayload
 ): Promise<void> {
-  const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
-  const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
   const body = JSON.stringify(payload);
   const headers = { "Content-Type": "application/json" };
   const calls: Promise<void>[] = [];
@@ -29,8 +30,14 @@ export async function fireShippingWebhooks(
             console.error(
               `[webhook] Buyer App returned ${res.status} for seller order ${sellerOrderId}: ${text}`
             );
+          } else {
+            console.info(
+              `[webhook] Buyer App successfully processed webhook for seller order ${sellerOrderId}. ${BUYER_APP_URL}`
+            );
           }
-        })
+        }
+      
+      )
         .catch((err) => {
           console.error(
             `[webhook] Failed to reach Buyer App for seller order ${sellerOrderId}:`,
@@ -53,6 +60,10 @@ export async function fireShippingWebhooks(
             const text = await res.text().catch(() => "(no body)");
             console.error(
               `[webhook] Seller App returned ${res.status} for seller order ${sellerOrderId}: ${text}`
+            );
+          } else {
+            console.info(
+              `[webhook] Seller App successfully processed webhook for seller order ${sellerOrderId}. ${SELLER_APP_URL}`
             );
           }
         })
