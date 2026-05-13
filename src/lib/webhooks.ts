@@ -1,21 +1,3 @@
-/**
- * lib/webhooks.ts
- *
- * Fires outbound shipping-status webhooks to Buyer App and Seller App
- * as specified in 02-responsabilidades.md and 03-apis.md.
- *
- * Both apps are keyed by sellerOrderId — the Buyer App listens on
- * POST /api/orders/:sellerOrderId/shipping-webhook because it already
- * knows the sellerOrderId from the order flow. No schema changes needed.
- *
- * Buyer App:  POST /api/orders/:sellerOrderId/shipping-webhook
- * Seller App: POST /api/seller-orders/:sellerOrderId/shipping-webhook
- *
- * Both calls are fire-and-forget: we await them with Promise.allSettled so
- * a downstream failure never breaks the Shipping App's own response.
- * Failures are logged to the console — wire up your preferred logger here.
- */
-
 export type ShipmentStatus = "LABEL_CREATED" | "IN_TRANSIT" | "DELIVERED";
 
 export interface ShippingWebhookPayload {
@@ -24,18 +6,12 @@ export interface ShippingWebhookPayload {
   status: ShipmentStatus;
 }
 
-const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
-const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
-
-/**
- * Sends shipping-status webhooks to Buyer App and Seller App.
- * Both use sellerOrderId as the order identifier in the URL.
- * Safe to call without await — internally uses Promise.allSettled.
- */
 export async function fireShippingWebhooks(
   sellerOrderId: string,
   payload: ShippingWebhookPayload
 ): Promise<void> {
+  const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
+  const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
   const body = JSON.stringify(payload);
   const headers = { "Content-Type": "application/json" };
   const calls: Promise<void>[] = [];
