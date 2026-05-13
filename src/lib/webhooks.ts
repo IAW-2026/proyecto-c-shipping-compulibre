@@ -6,7 +6,8 @@ export interface ShippingWebhookPayload {
   status: ShipmentStatus;
 }
 
-
+  const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
+  const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
 
 export async function fireShippingWebhooks(
   sellerOrderId: string,
@@ -15,8 +16,7 @@ export async function fireShippingWebhooks(
   const body = JSON.stringify(payload);
   const headers = { "Content-Type": "application/json" };
   const calls: Promise<void>[] = [];
-  const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
-  const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
+
 
   // ── Buyer App ──────────────────────────────────────────────────────────────
   // POST /api/orders/:sellerOrderId/shipping-webhook
