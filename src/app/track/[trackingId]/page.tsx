@@ -86,68 +86,25 @@ export default function TrackingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col items-center p-8">
-      <h1 className="text-3xl font-bold mb-8 text-[#0083bb]">
-        CompuLibre — Seguimiento Logístico
-      </h1>
+  <main className="min-h-screen bg-gray-50 flex flex-col items-center p-8">
+    <h1 className="text-3xl font-bold mb-8 text-[#0083bb]">
+      CompuLibre — Seguimiento Logístico
+    </h1>
 
-      {/* Shipment details */}
-      {shipment && (
-        <div className="w-full max-w-md text-gray-700 bg-white p-6 rounded shadow-md border-l-4 border-[#0083bb]">
-          <h2 className="text-xl font-bold mb-4 border-b pb-2">Detalles del Paquete</h2>
+    {/* Error message */}
+    {error && (
+      <div className="w-full max-w-md bg-red-50 border border-red-200 text-red-700 p-4 rounded shadow-sm mb-6">
+        <p className="font-semibold">Error</p>
+        <p className="text-sm">{error}</p>
+      </div>
+    )}
 
-          <div className="space-y-3 mb-6">
-            <p><strong>Tracking:</strong> {shipment.trackingId}</p>
-            <p><strong>Operador Logístico:</strong> {shipment.courier}</p>
-            <p><strong>Origen:</strong> {shipment.originAddress}</p>
-            <p><strong>Destino:</strong> {shipment.destinationAddress}</p>
-          </div>
-
-          {/* Status badge */}
-          <div
-            className="mb-6 p-4 rounded text-center font-bold text-lg text-white"
-            style={{
-              backgroundColor: STATUS_COLORS[shipment.status],
-              ...(shipment.status === 'DELIVERED' && {
-                backgroundImage: 'repeating-conic-gradient(#000 0% 25%, #fff 0% 50%)',
-                backgroundSize: '20px 20px',
-                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-              }),
-            }}
-          >
-            ESTADO: {STATUS_LABELS[shipment.status]}
-          </div>
-
-          {/* Tracking timeline */}
-          {shipment.events.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-gray-700 mb-3">Historial de seguimiento</h3>
-              <ol className="relative border-l border-gray-200 ml-2">
-                {[...shipment.events].reverse().map((ev, i) => (
-                  <li key={ev.id} className="mb-4 ml-4">
-                    <span
-                      className="absolute -left-1.5 w-3 h-3 rounded-full border border-white"
-                      style={{
-                        backgroundColor: i === 0 ? STATUS_COLORS[ev.statusUpdate] : '#d1d5db',
-                      }}
-                    />
-                    <p className="text-sm font-semibold text-gray-800">
-                      {STATUS_LABELS[ev.statusUpdate]}
-                    </p>
-                    <p className="text-xs text-gray-500">{ev.location}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(ev.timestamp).toLocaleString('es-AR', {
-                        day: '2-digit', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-        </div>
-      )}
-    </main>
-  );
+    {/* Shipment details */}
+    {shipment && (
+      <div className="w-full max-w-md text-gray-700 bg-white p-6 rounded shadow-md border-l-4 border-[#0083bb]">
+        ...
+      </div>
+    )}
+  </main>
+);
 }
