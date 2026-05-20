@@ -47,12 +47,7 @@ export async function POST(req: NextRequest) {
 
     const trackingId = generateTrackingId();
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.APP_URL ||
-      "http://localhost:3000";
-
-    const generatedLabelUrl = `${baseUrl}/track/${encodeURIComponent(trackingId)}`;
+    const generatedLabelUrl = `proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
 
     const shipment = await prisma.shipment.create({
       data: {
