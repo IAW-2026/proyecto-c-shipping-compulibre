@@ -1,12 +1,13 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ShipmentStatus } from "@prisma/client";
-
+ 
 function generateTrackingId(): string {
   const num = Math.floor(Math.random() * 90000) + 10000;
   return `TRK-COMPU-${num}`;
 }
-
+ 
 // GET /api/shipments — list all shipments with their events
 export async function GET() {
   try {
@@ -27,31 +28,47 @@ export async function GET() {
     );
   }
 }
-
+ 
 // POST /api/shipments — create a new shipment (called by Payments App or admin)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sellerOrderId, sellerId, buyerAddress, originAddress, courier } = body;
-
+    const {
+      sellerOrderId,
+      sellerId,
+      buyerAddress,
+      originAddress,
+      courier,
+      externalTrackingId,
+    } = body;
+ 
     if (!sellerOrderId || !buyerAddress || !originAddress || !courier) {
       return NextResponse.json(
-        { error: "Missing required fields: sellerOrderId, buyerAddress, originAddress, courier" },
+        {
+          error:
+            "Missing required fields: sellerOrderId, buyerAddress, originAddress, courier",
+        },
         { status: 400 }
       );
     }
-
-    // Se acepta sellerId sin usar (enviado por Payments App) para mantener compatibilidad, 
-    // pero no se utiliza en este servicio
+ 
+    if (!externalTrackingId) {
+      return NextResponse.json(
+        { error: "Missing required field: externalTrackingId" },
+        { status: 400 }
+      );
+    }
+ 
+    // Accepted but unused — kept for compatibility with Payments App contract
     void sellerId;
-
+ 
     const trackingId = generateTrackingId();
-
     const generatedLabelUrl = `proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
-
+ 
     const shipment = await prisma.shipment.create({
       data: {
         trackingId,
+        externalTrackingId,
         externalSellerOrderId: sellerOrderId,
         courier,
         originAddress,
@@ -67,16 +84,53 @@ export async function POST(req: NextRequest) {
       },
       include: { events: true },
     });
-
-    return NextResponse.json(
-      {
-        trackingId: shipment.trackingId,
-        status: shipment.status,
-        courier: shipment.courier,
-        labelUrl: shipment.labelUrl,
-      },
-      { status: 201 }
-    );
+ 
+    // Register with external courier status-change listener.
+    // If this fails the shipment is still valid — caller receives a warning.
+    let webhookWarning: string | undefined;
+    try {
+      const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/shipments/update`;;
+      const webhookRes = await fetch(
+        `${process.env.COURIER_LISTENER_URL}/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            externalTrackingId,
+            callbackUrl: webhookUrl,
+          }),
+        }
+      );
+ 
+      if (!webhookRes.ok) {
+        const text = await webhookRes.text();
+        console.warn(
+          "[POST /api/shipments] Webhook registration non-2xx:",
+          webhookRes.status,
+          text
+        );
+        webhookWarning =
+          "Shipment created but status-change listener registration failed. Updates may not be received automatically.";
+      }
+    } catch (webhookError) {
+      console.warn(
+        "[POST /api/shipments] Webhook registration threw:",
+        webhookError
+      );
+      webhookWarning =
+        "Shipment created but status-change listener could not be reached. Updates may not be received automatically.";
+    }
+ 
+    const response = {
+      trackingId: shipment.trackingId,
+      externalTrackingId: shipment.externalTrackingId,
+      status: shipment.status,
+      courier: shipment.courier,
+      labelUrl: shipment.labelUrl,
+      ...(webhookWarning ? { warning: webhookWarning } : {}),
+    };
+ 
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("[POST /api/shipments]", error);
     return NextResponse.json(

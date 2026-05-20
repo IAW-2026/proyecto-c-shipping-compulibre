@@ -17,6 +17,7 @@ interface ShipmentEvent {
 
 interface Shipment {
   trackingId: string;
+  externalTrackingId: string;
   externalSellerOrderId: string;
   courier: string;
   originAddress: string;
@@ -166,13 +167,16 @@ function ShipmentRow({
           padding: "14px 20px",
         }}
       >
-        {/* Tracking ID */}
+        {/* Tracking IDs */}
         <div>
           <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2, fontFamily: "var(--font-mono)" }}>
             Tracking ID
           </div>
           <div style={{ fontSize: 13, color: "#f8fafc", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
             {shipment.trackingId}
+          </div>
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 2, fontFamily: "var(--font-mono)" }}>
+            ext: {shipment.externalTrackingId}
           </div>
           <div style={{ fontSize: 11, color: "#475569", marginTop: 1 }}>
             Order: {shipment.externalSellerOrderId}
@@ -353,23 +357,6 @@ function ShipmentRow({
                 ))}
             </div>
           )}
-          {shipment.labelUrl && (
-            <a
-              href={shipment.labelUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "inline-block",
-                marginTop: 12,
-                color: "#60a5fa",
-                fontSize: 12,
-                textDecoration: "none",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              📄 View Label PDF →
-            </a>
-          )}
         </div>
       )}
     </div>
@@ -387,6 +374,7 @@ function CreateModal({
   onClose: () => void;
   onCreate: (data: {
     sellerOrderId: string;
+    externalTrackingId: string;
     courier: string;
     originAddress: string;
     buyerAddress: string;
@@ -395,6 +383,7 @@ function CreateModal({
 }) {
   const [form, setForm] = useState({
     sellerOrderId: "",
+    externalTrackingId: "",
     courier: COURIERS[0],
     originAddress: "",
     buyerAddress: "",
@@ -404,12 +393,18 @@ function CreateModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.sellerOrderId.trim() || !form.originAddress.trim() || !form.buyerAddress.trim()) {
-      setError("Seller Order ID, Origin Address, and Destination Address are required.");
+    if (
+      !form.sellerOrderId.trim() ||
+      !form.externalTrackingId.trim() ||
+      !form.originAddress.trim() ||
+      !form.buyerAddress.trim()
+    ) {
+      setError("Seller Order ID, Courier Tracking ID, Origin Address, and Destination Address are required.");
       return;
     }
     onCreate({
       sellerOrderId: form.sellerOrderId.trim(),
+      externalTrackingId: form.externalTrackingId.trim(),
       courier: form.courier,
       originAddress: form.originAddress.trim(),
       buyerAddress: form.buyerAddress.trim(),
@@ -486,6 +481,19 @@ function CreateModal({
               value={form.sellerOrderId}
               onChange={(e) => setForm((f) => ({ ...f, sellerOrderId: e.target.value }))}
             />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Courier Tracking ID *</label>
+            <input
+              style={inputStyle}
+              placeholder="ANDREANI-00123456"
+              value={form.externalTrackingId}
+              onChange={(e) => setForm((f) => ({ ...f, externalTrackingId: e.target.value }))}
+            />
+            <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
+              The tracking ID provided by the courier for status updates.
+            </div>
           </div>
 
           <div>
@@ -572,9 +580,9 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
 
   // Sync AdminProfile row on first login (per 05-usuarios.md)
   useEffect(() => {
-    fetch("/api/admin/sync-profile", { method: "POST" }).catch(() => {
-    });
+    fetch("/api/admin/sync-profile", { method: "POST" }).catch(() => {});
   }, []);
+
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -582,11 +590,11 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
   const [showCreate, setShowCreate] = useState(false);
   const [filter, setFilter] = useState<ShipmentStatus | "ALL">("ALL");
   const [search, setSearch] = useState("");
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "warning" } | null>(null);
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
+  const showToast = (msg: string, type: "success" | "error" | "warning" = "success") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const loadShipments = useCallback(async () => {
@@ -608,29 +616,29 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
   }, [loadShipments]);
 
   async function handleAdvance(trackingId: string) {
-  const shipment = shipments.find((s) => s.trackingId === trackingId);
-  const location = shipment?.status === "IN_TRANSIT" ? shipment.destinationAddress : "En camino";
+    const shipment = shipments.find((s) => s.trackingId === trackingId);
+    const location = shipment?.status === "IN_TRANSIT" ? shipment.destinationAddress : "En camino";
 
-  try {
-    const res = await fetch(`/api/shipments/${trackingId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location }),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      showToast(d.error ?? "Failed to advance status", "error");
-      return;
+    try {
+      const res = await fetch(`/api/shipments/${trackingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error ?? "Failed to advance status", "error");
+        return;
+      }
+      const updated: Shipment = await res.json();
+      setShipments((prev) =>
+        prev.map((s) => (s.trackingId === trackingId ? updated : s))
+      );
+      showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
+    } catch {
+      showToast("Network error", "error");
     }
-    const updated: Shipment = await res.json();
-    setShipments((prev) =>
-      prev.map((s) => (s.trackingId === trackingId ? updated : s))
-    );
-    showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
-  } catch {
-    showToast("Network error", "error");
   }
-}
 
   async function handleDelete(trackingId: string) {
     if (!confirm(`Delete shipment ${trackingId}? This cannot be undone.`)) return;
@@ -649,6 +657,7 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
 
   async function handleCreate(data: {
     sellerOrderId: string;
+    externalTrackingId: string;
     courier: string;
     originAddress: string;
     buyerAddress: string;
@@ -665,8 +674,14 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
         showToast(d.error ?? "Failed to create", "error");
         return;
       }
+      const created = await res.json();
       setShowCreate(false);
-      showToast("Shipment created successfully");
+      // Surface webhook warning if the API returned one
+      if (created.warning) {
+        showToast(`Created — ⚠ ${created.warning}`, "warning");
+      } else {
+        showToast("Shipment created successfully");
+      }
       await loadShipments();
     } catch {
       showToast("Network error", "error");
@@ -679,6 +694,7 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     const matchSearch =
       !q ||
       s.trackingId.toLowerCase().includes(q) ||
+      s.externalTrackingId.toLowerCase().includes(q) ||
       s.externalSellerOrderId.toLowerCase().includes(q) ||
       s.courier.toLowerCase().includes(q) ||
       s.destinationAddress.toLowerCase().includes(q);
@@ -691,6 +707,12 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     LABEL_CREATED: shipments.filter((s) => s.status === "LABEL_CREATED").length,
     IN_TRANSIT: shipments.filter((s) => s.status === "IN_TRANSIT").length,
     DELIVERED: shipments.filter((s) => s.status === "DELIVERED").length,
+  };
+
+  const toastColors = {
+    success: { bg: "#052e16", border: "#166534", text: "#4ade80" },
+    error:   { bg: "#1c0a0a", border: "#7f1d1d", text: "#f87171" },
+    warning: { bg: "#1c1500", border: "#92400e", text: "#fbbf24" },
   };
 
   return (
@@ -843,7 +865,7 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
           {/* Toolbar */}
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
             <input
-              placeholder="Search tracking ID, order, courier, address…"
+              placeholder="Search tracking ID, courier ID, order, courier, address…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -953,9 +975,9 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
             position: "fixed",
             bottom: 24,
             right: 24,
-            background: toast.type === "success" ? "#052e16" : "#1c0a0a",
-            border: `1px solid ${toast.type === "success" ? "#166534" : "#7f1d1d"}`,
-            color: toast.type === "success" ? "#4ade80" : "#f87171",
+            background: toastColors[toast.type].bg,
+            border: `1px solid ${toastColors[toast.type].border}`,
+            color: toastColors[toast.type].text,
             padding: "10px 20px",
             borderRadius: 10,
             fontSize: 13,
@@ -963,6 +985,7 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
             zIndex: 100,
             animation: "fadeIn 0.2s ease",
             boxShadow: "0 8px 32px #00000066",
+            maxWidth: 420,
           }}
         >
           {toast.msg}

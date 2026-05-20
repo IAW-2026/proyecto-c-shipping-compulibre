@@ -1,10 +1,11 @@
-/*
-  Warnings:
+-- Add column as nullable first so existing rows aren't rejected
+ALTER TABLE "shipments" ADD COLUMN "external_tracking_id" TEXT;
 
-  - The primary key for the `admin_profiles` table will be changed. If it partially fails, the table could be left without primary key constraint.
-  - You are about to drop the column `id` on the `admin_profiles` table. All the data in the column will be lost.
+-- Backfill existing rows with a placeholder derived from their own tracking_id
+UPDATE "shipments"
+SET "external_tracking_id" = 'LEGACY-' || "tracking_id"
+WHERE "external_tracking_id" IS NULL;
 
-*/
--- AlterTable
-ALTER TABLE "admin_profiles" DROP CONSTRAINT "admin_profiles_pkey",
-DROP COLUMN "id";
+-- Now that every row has a value, enforce NOT NULL and add the unique constraint
+ALTER TABLE "shipments" ALTER COLUMN "external_tracking_id" SET NOT NULL;
+ALTER TABLE "shipments" ADD CONSTRAINT "shipments_external_tracking_id_key" UNIQUE ("external_tracking_id");
