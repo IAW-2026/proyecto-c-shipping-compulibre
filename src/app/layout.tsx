@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CompuLibre Shipping Admin",
-  description: "Shipping management dashboard",
+  title: "CompuLibre Shipping App",
+  description: "Shipping App de CompuLibre",
 };
 
 export default function RootLayout({

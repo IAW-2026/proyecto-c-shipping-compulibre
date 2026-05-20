@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
     void sellerId;
  
     const trackingId = generateTrackingId();
-    const generatedLabelUrl = `proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
+    const generatedLabelUrl =
+    `https://proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
  
     const shipment = await prisma.shipment.create({
       data: {
@@ -90,17 +91,22 @@ export async function POST(req: NextRequest) {
     let webhookWarning: string | undefined;
     try {
       const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/shipments/update`;;
-      const webhookRes = await fetch(
-        `${process.env.COURIER_LISTENER_URL}/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            externalTrackingId,
-            callbackUrl: webhookUrl,
-          }),
-        }
-      );
+      const courierBase = process.env.COURIER_LISTENER_URL?.replace(/\/$/, "");
+      console.log("COURIER:", process.env.COURIER_LISTENER_URL);
+      console.log("APP:", process.env.NEXT_PUBLIC_APP_URL);
+      console.log("REGISTER URL:", `${courierBase}/register`);
+      console.log("CALLBACK URL:", webhookUrl);
+    const webhookRes = await fetch(
+    `${courierBase}/register`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+      externalTrackingId,
+      callbackUrl: webhookUrl,
+    }),
+  }
+);
  
       if (!webhookRes.ok) {
         const text = await webhookRes.text();
