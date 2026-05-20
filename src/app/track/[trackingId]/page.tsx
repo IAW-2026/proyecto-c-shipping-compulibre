@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ShipmentStatus } from '@prisma/client';
+import Image from "next/image";
 
 interface ShipmentEvent {
   id: string;
@@ -25,14 +26,14 @@ interface Shipment {
 }
 
 const STATUS_LABELS: Record<ShipmentStatus, string> = {
-  LABEL_CREATED: 'Etiqueta creada',
+  LABEL_CREATED: 'Envio creado',
   IN_TRANSIT:    'En tránsito',
   DELIVERED:     'Entregado',
 };
 
 const STATUS_COLORS: Record<ShipmentStatus, string> = {
-  LABEL_CREATED: '#0083bb',
-  IN_TRANSIT:    '#fc7f40',
+  LABEL_CREATED: '#485696',
+  IN_TRANSIT:    '#FC7A1E',
   DELIVERED:     '#10b981',
 };
 
@@ -87,9 +88,20 @@ export default function TrackingPage() {
 
   return (
   <main className="min-h-screen bg-gray-50 flex flex-col items-center p-8">
-    <h1 className="text-3xl font-bold mb-8 text-[#0083bb]">
-      CompuLibre — Seguimiento Logístico
-    </h1>
+    <div className="flex flex-col sm:flex-row items-center gap-4 mb-8 text-center sm:text-left">
+          <Image
+            src="/compuLibre-logo.png"
+            alt="CompuLibre Logo"
+            width={128}
+            height={128}
+            className="rounded"
+            priority
+          />
+    
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#485696]">
+          CompuLibre - Seguimiento Logístico
+        </h1>
+      </div>
 
     {/* Error message */}
     {error && (
@@ -100,11 +112,57 @@ export default function TrackingPage() {
     )}
 
     {/* Shipment details */}
-    {shipment && (
-      <div className="w-full max-w-md text-gray-700 bg-white p-6 rounded shadow-md border-l-4 border-[#0083bb]">
-        ...
-      </div>
-    )}
+      {shipment && (
+        <div className="w-full max-w-md text-gray-700 bg-white p-6 rounded shadow-md border-l-4 border-[#0083bb]">
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">Detalles del Paquete</h2>
+
+          <div className="space-y-3 mb-6">
+            <p><strong>Tracking:</strong> {shipment.trackingId}</p>
+            <p><strong>Operador Logístico:</strong> {shipment.courier}</p>
+            <p><strong>Origen:</strong> {shipment.originAddress}</p>
+            <p><strong>Destino:</strong> {shipment.destinationAddress}</p>
+          </div>
+
+          {/* Status badge */}
+          <div
+            className="mb-6 p-4 rounded text-center font-bold text-lg text-white"
+            style={{
+              backgroundColor: STATUS_COLORS[shipment.status]
+            }}
+          >
+            ESTADO: {STATUS_LABELS[shipment.status]}
+          </div>
+
+          {/* Tracking timeline */}
+          {shipment.events.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-gray-700 mb-3">Historial de seguimiento</h3>
+              <ol className="relative border-l border-gray-200 ml-2">
+                {[...shipment.events].reverse().map((ev, i) => (
+                  <li key={ev.id} className="mb-4 ml-4">
+                    <span
+                      className="absolute -left-1.5 w-3 h-3 rounded-full border border-white"
+                      style={{
+                        backgroundColor: i === 0 ? STATUS_COLORS[ev.statusUpdate] : '#d1d5db',
+                      }}
+                    />
+                    <p className="text-sm font-semibold text-gray-800">
+                      {STATUS_LABELS[ev.statusUpdate]}
+                    </p>
+                    <p className="text-xs text-gray-500">{ev.location}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(ev.timestamp).toLocaleString('es-AR', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
   </main>
 );
 }

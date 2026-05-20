@@ -523,16 +523,6 @@ function CreateModal({
             />
           </div>
 
-          <div>
-            <label style={labelStyle}>Label URL (optional)</label>
-            <input
-              style={inputStyle}
-              placeholder="https://..."
-              value={form.labelUrl}
-              onChange={(e) => setForm((f) => ({ ...f, labelUrl: e.target.value }))}
-            />
-          </div>
-
           {error && (
             <p style={{ color: "#f87171", fontSize: 12, margin: 0 }}>{error}</p>
           )}

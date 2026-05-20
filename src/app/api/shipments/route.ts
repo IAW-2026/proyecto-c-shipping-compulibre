@@ -32,7 +32,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sellerOrderId, sellerId, buyerAddress, originAddress, courier, labelUrl } = body;
+    const { sellerOrderId, sellerId, buyerAddress, originAddress, courier } = body;
 
     if (!sellerOrderId || !buyerAddress || !originAddress || !courier) {
       return NextResponse.json(
@@ -47,6 +47,13 @@ export async function POST(req: NextRequest) {
 
     const trackingId = generateTrackingId();
 
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      "http://localhost:3000";
+
+    const generatedLabelUrl = `${baseUrl}/track/${encodeURIComponent(trackingId)}`;
+
     const shipment = await prisma.shipment.create({
       data: {
         trackingId,
@@ -55,7 +62,7 @@ export async function POST(req: NextRequest) {
         originAddress,
         destinationAddress: buyerAddress,
         status: ShipmentStatus.LABEL_CREATED,
-        labelUrl: labelUrl ?? null,
+        labelUrl: generatedLabelUrl,
         events: {
           create: {
             statusUpdate: ShipmentStatus.LABEL_CREATED,
