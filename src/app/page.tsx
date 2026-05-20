@@ -1,75 +1,19 @@
 "use client";
-import { useState } from 'react';
-import { ShipmentStatus } from '@prisma/client';
 
-// Shape returned by GET /api/shipments/[trackingId]
-interface ShipmentEvent {
-  id: string;
-  trackingId: string;
-  statusUpdate: ShipmentStatus;
-  location: string;
-  timestamp: string;
-}
-
-interface Shipment {
-  trackingId: string;
-  externalSellerOrderId: string;
-  courier: string;
-  originAddress: string;
-  destinationAddress: string;
-  status: ShipmentStatus;
-  labelUrl: string | null;
-  createdAt: string;
-  updatedAt: string;
-  events: ShipmentEvent[];
-}
-
-const STATUS_LABELS: Record<ShipmentStatus, string> = {
-  LABEL_CREATED: 'Etiqueta creada',
-  IN_TRANSIT:    'En tránsito',
-  DELIVERED:     'Entregado',
-};
-
-const STATUS_COLORS: Record<ShipmentStatus, string> = {
-  LABEL_CREATED: '#0083bb',
-  IN_TRANSIT:    '#fc7f40',
-  DELIVERED:     '#10b981',
-};
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function TrackingPage() {
-  const [trackingId, setTrackingId] = useState('');
-  const [shipment, setShipment]     = useState<Shipment | null>(null);
-  const [error, setError]           = useState('');
-  const [loading, setLoading]       = useState(false);
+  const [trackingId, setTrackingId] = useState("");
+  const router = useRouter();
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trackingId.trim()) return;
 
-    setLoading(true);
-    setError('');
-    setShipment(null);
+    const trimmed = trackingId.trim();
+    if (!trimmed) return;
 
-    try {
-      const res = await fetch(`/api/shipments/${encodeURIComponent(trackingId.trim())}`);
-
-      if (res.status === 404) {
-        setError('Envío no encontrado. Verificá el número de tracking.');
-        return;
-      }
-
-      if (!res.ok) {
-        setError('Error del servidor. Intentá de nuevo más tarde.');
-        return;
-      }
-
-      const data: Shipment = await res.json();
-      setShipment(data);
-    } catch {
-      setError('No se pudo conectar al servidor.');
-    } finally {
-      setLoading(false);
-    }
+    router.push(`/track/${encodeURIComponent(trimmed)}`);
   };
 
   return (
@@ -78,90 +22,32 @@ export default function TrackingPage() {
         CompuLibre — Seguimiento Logístico
       </h1>
 
-      {/* Search form */}
-      <form onSubmit={handleSearch} className="w-full max-w-md bg-white p-6 rounded shadow-md mb-8">
+      <form
+        onSubmit={handleSearch}
+        className="w-full max-w-md bg-white p-6 rounded shadow-md"
+      >
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Número de Tracking
         </label>
+
         <div className="flex gap-2">
           <input
             type="text"
             value={trackingId}
             onChange={(e) => setTrackingId(e.target.value)}
-            className="flex-1 border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#0083bb]"
-            placeholder="Ej: TRK-COMPU-0042"
-            disabled={loading}
+            className="flex-1 border p-2 text-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-[#0083bb]"
+            placeholder="Ej: TRK-COMPU-9120"
           />
+
           <button
             type="submit"
             className="bg-[#0083bb] text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-            disabled={loading || !trackingId.trim()}
+            disabled={!trackingId.trim()}
           >
-            {loading ? 'Buscando...' : 'Buscar'}
+            Buscar
           </button>
         </div>
-        {error && (
-          <p className="text-[#e6538a] mt-2 text-sm font-semibold">{error}</p>
-        )}
       </form>
-
-      {/* Shipment details */}
-      {shipment && (
-        <div className="w-full max-w-md bg-white p-6 rounded shadow-md border-l-4 border-[#0083bb]">
-          <h2 className="text-xl font-bold mb-4 border-b pb-2">Detalles del Paquete</h2>
-
-          <div className="space-y-3 mb-6">
-            <p><strong>Tracking:</strong> {shipment.trackingId}</p>
-            <p><strong>Operador Logístico:</strong> {shipment.courier}</p>
-            <p><strong>Origen:</strong> {shipment.originAddress}</p>
-            <p><strong>Destino:</strong> {shipment.destinationAddress}</p>
-          </div>
-
-          {/* Status badge */}
-          <div
-            className="mb-6 p-4 rounded text-center font-bold text-lg text-white"
-            style={{
-              backgroundColor: STATUS_COLORS[shipment.status],
-              ...(shipment.status === 'DELIVERED' && {
-                backgroundImage: 'repeating-conic-gradient(#000 0% 25%, #fff 0% 50%)',
-                backgroundSize: '20px 20px',
-                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-              }),
-            }}
-          >
-            ESTADO: {STATUS_LABELS[shipment.status]}
-          </div>
-
-          {/* Tracking timeline */}
-          {shipment.events.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-gray-700 mb-3">Historial de seguimiento</h3>
-              <ol className="relative border-l border-gray-200 ml-2">
-                {[...shipment.events].reverse().map((ev, i) => (
-                  <li key={ev.id} className="mb-4 ml-4">
-                    <span
-                      className="absolute -left-1.5 w-3 h-3 rounded-full border border-white"
-                      style={{
-                        backgroundColor: i === 0 ? STATUS_COLORS[ev.statusUpdate] : '#d1d5db',
-                      }}
-                    />
-                    <p className="text-sm font-semibold text-gray-800">
-                      {STATUS_LABELS[ev.statusUpdate]}
-                    </p>
-                    <p className="text-xs text-gray-500">{ev.location}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(ev.timestamp).toLocaleString('es-AR', {
-                        day: '2-digit', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-        </div>
-      )}
     </main>
   );
 }

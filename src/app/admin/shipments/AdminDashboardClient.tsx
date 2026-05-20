@@ -583,7 +583,6 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
   // Sync AdminProfile row on first login (per 05-usuarios.md)
   useEffect(() => {
     fetch("/api/admin/sync-profile", { method: "POST" }).catch(() => {
-      // Non-critical: profile sync failure doesn't block the dashboard
     });
   }, []);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -619,26 +618,29 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
   }, [loadShipments]);
 
   async function handleAdvance(trackingId: string) {
-    try {
-      const res = await fetch(`/api/shipments/${trackingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location: "En route" }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        showToast(d.error ?? "Failed to advance status", "error");
-        return;
-      }
-      const updated: Shipment = await res.json();
-      setShipments((prev) =>
-        prev.map((s) => (s.trackingId === trackingId ? updated : s))
-      );
-      showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
-    } catch {
-      showToast("Network error", "error");
+  const shipment = shipments.find((s) => s.trackingId === trackingId);
+  const location = shipment?.status === "IN_TRANSIT" ? shipment.destinationAddress : "En camino";
+
+  try {
+    const res = await fetch(`/api/shipments/${trackingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location }),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      showToast(d.error ?? "Failed to advance status", "error");
+      return;
     }
+    const updated: Shipment = await res.json();
+    setShipments((prev) =>
+      prev.map((s) => (s.trackingId === trackingId ? updated : s))
+    );
+    showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
+  } catch {
+    showToast("Network error", "error");
   }
+}
 
   async function handleDelete(trackingId: string) {
     if (!confirm(`Delete shipment ${trackingId}? This cannot be undone.`)) return;
