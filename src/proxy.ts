@@ -1,35 +1,64 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// Routes that require authentication
-const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+// Admin-only routes
+const isAdminRoute = createRouteMatcher([
+  "/admin(.*)",
+]);
+
+// Public webhook/API routes that must bypass auth
+const isPublicRoute = createRouteMatcher([
+  "/api/shipments/update",
+]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (!isAdminRoute(req)) return; // public routes pass through
+  // Allow public webhook routes immediately
+  if (isPublicRoute(req)) {
+    return NextResponse.next();
+  }
+
+  // Non-admin routes remain public
+  if (!isAdminRoute(req)) {
+    return NextResponse.next();
+  }
+
   const { userId, sessionClaims } = await auth();
 
-  // 1. Not signed in at all → redirect to Clerk's hosted sign-in
+  // Not signed in → redirect to sign-in
   if (!userId) {
     const signInUrl = new URL("/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", req.url);
+
     return NextResponse.redirect(signInUrl);
   }
 
-  // 2. Signed in but not an admin → 403 page
+  // Check admin role
   const roles =
-  (sessionClaims?.metadata as { role?: string; roles?: string[] } | undefined);
+    sessionClaims?.metadata as
+      | { role?: string; roles?: string[] }
+      | undefined;
 
   const isAdmin =
-    roles?.roles?.includes("admin") || roles?.role === "admin";
+    roles?.roles?.includes("admin") ||
+    roles?.role === "admin";
 
+  // Signed in but not admin
   if (!isAdmin) {
-    return NextResponse.redirect(new URL("/unauthorized", req.url));
+    return NextResponse.redirect(
+      new URL("/unauthorized", req.url)
+    );
   }
+
+  return NextResponse.next();
 });
 
 export const config = {
   matcher: [
-    // Run on all routes except Next.js internals and static files
+    /*
+     * Match all routes except:
+     * - _next
+     * - static files
+     */
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
