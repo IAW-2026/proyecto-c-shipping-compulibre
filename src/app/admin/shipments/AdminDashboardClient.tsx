@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 
+export const dynamic = "force-dynamic";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ShipmentStatus = "LABEL_CREATED" | "IN_TRANSIT" | "DELIVERED";
@@ -599,8 +601,14 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
 
   const loadShipments = useCallback(async () => {
     try {
+      
       setLoading(true);
-      const res = await fetch("/api/shipments");
+      const res = await fetch("/api/shipments", {
+        headers: {
+          "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_APP_KEY!,
+        },
+      });
+
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       setShipments(data);

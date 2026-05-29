@@ -1,15 +1,32 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ShipmentStatus } from "@prisma/client";
- 
+
 function generateTrackingId(): string {
   const num = Math.floor(Math.random() * 90000) + 10000;
   return `TRK-COMPU-${num}`;
 }
- 
-// GET /api/shipments — list all shipments with their events
-export async function GET() {
+
+// ── Auth helper ───────────────────────────────────────────────────────────────
+
+function isAuthorized(req: NextRequest): boolean {
+  const key = req.headers.get("x-api-key");
+  return !!key && key === process.env.SELLER_KEY;
+}
+
+function isShippingApp(req: NextRequest): boolean {
+  const key = req.headers.get("x-api-key");
+  return !!key && key === process.env.NEXT_PUBLIC_SHIPPING_APP_KEY;
+}
+
+// ── GET /api/shipments ────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
+  //Actualmente shipping es la unica app que puede listar todos los envíos, pero se podría extender a otras apps si se quisiera.
+  if (!isShippingApp(req)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const shipments = await prisma.shipment.findMany({
       include: {
@@ -28,9 +45,15 @@ export async function GET() {
     );
   }
 }
- 
-// POST /api/shipments — create a new shipment (called by Payments App or admin)
+
+// ── POST /api/shipments ───────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
+  //Actualmente solo la Seller App puede crear envíos, pero se podría extender a otras apps si se quisiera.
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const {
@@ -41,7 +64,7 @@ export async function POST(req: NextRequest) {
       courier,
       externalTrackingId,
     } = body;
- 
+
     if (!sellerOrderId || !buyerAddress || !originAddress || !courier) {
       return NextResponse.json(
         {
@@ -51,21 +74,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
- 
+
     if (!externalTrackingId) {
       return NextResponse.json(
         { error: "Missing required field: externalTrackingId" },
         { status: 400 }
       );
     }
- 
+
     // Accepted but unused — kept for compatibility with Payments App contract
     void sellerId;
- 
+
     const trackingId = generateTrackingId();
-    const generatedLabelUrl =
-    `https://proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
- 
+    const generatedLabelUrl = `https://proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
+
     const shipment = await prisma.shipment.create({
       data: {
         trackingId,
@@ -85,29 +107,26 @@ export async function POST(req: NextRequest) {
       },
       include: { events: true },
     });
- 
+
     // Register with external courier status-change listener.
     // If this fails the shipment is still valid — caller receives a warning.
     let webhookWarning: string | undefined;
     try {
-      const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/shipments/update`;;
+      const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/shipments/update`;
       const courierBase = process.env.COURIER_LISTENER_URL?.replace(/\/$/, "");
       console.log("COURIER:", process.env.COURIER_LISTENER_URL);
       console.log("APP:", process.env.NEXT_PUBLIC_APP_URL);
       console.log("REGISTER URL:", `${courierBase}/register`);
       console.log("CALLBACK URL:", webhookUrl);
-    const webhookRes = await fetch(
-    `${courierBase}/register`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-      externalTrackingId,
-      callbackUrl: webhookUrl,
-    }),
-  }
-);
- 
+      const webhookRes = await fetch(`${courierBase}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          externalTrackingId,
+          callbackUrl: webhookUrl,
+        }),
+      });
+
       if (!webhookRes.ok) {
         const text = await webhookRes.text();
         console.warn(
@@ -126,7 +145,7 @@ export async function POST(req: NextRequest) {
       webhookWarning =
         "Shipment created but status-change listener could not be reached. Updates may not be received automatically.";
     }
- 
+
     const response = {
       trackingId: shipment.trackingId,
       externalTrackingId: shipment.externalTrackingId,
@@ -135,7 +154,7 @@ export async function POST(req: NextRequest) {
       labelUrl: shipment.labelUrl,
       ...(webhookWarning ? { warning: webhookWarning } : {}),
     };
- 
+
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("[POST /api/shipments]", error);
