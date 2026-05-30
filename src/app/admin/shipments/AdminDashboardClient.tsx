@@ -379,10 +379,10 @@ function CreateModal({
     originAddress: string;
     buyerAddress: string;
     labelUrl?: string;
-    externalBuyerId: string;   // ← new
-    externalSellerId: string;  // ← new
+    externalBuyerOrder: string;  // ← renamed
+    externalSellerId: string;
   }) => void;
-}) {
+  }) {
   const [form, setForm] = useState({
     sellerOrderId: "",
     externalTrackingId: "",
@@ -390,7 +390,7 @@ function CreateModal({
     originAddress: "",
     buyerAddress: "",
     labelUrl: "",
-    externalBuyerId: "",
+    externalBuyerOrder: "",  // ← renamed
     externalSellerId: "",
   });
   const [error, setError] = useState("");
@@ -413,8 +413,8 @@ function CreateModal({
       originAddress: form.originAddress.trim(),
       buyerAddress: form.buyerAddress.trim(),
       labelUrl: form.labelUrl.trim() || undefined,
-      externalBuyerId: form.externalBuyerId.trim(),   // ← new
-      externalSellerId: form.externalSellerId.trim(),  // ← new
+      externalBuyerOrder: form.externalBuyerOrder.trim(),  // ← renamed
+      externalSellerId: form.externalSellerId.trim(),
     });
   }
 
@@ -537,12 +537,12 @@ function CreateModal({
             />
           </div>
           <div>
-            <label style={labelStyle}>Buyer ID</label>        
-            <input        
-              style={inputStyle}        
-              placeholder="buyer_123"       
-              value={form.externalBuyerId}        
-              onChange={(e) => setForm((f) => ({ ...f, externalBuyerId: e.target.value }))}
+            <label style={labelStyle}>Buyer Order ID</label>
+            <input
+              style={inputStyle}
+              placeholder="buy_ord_123"                        
+              value={form.externalBuyerOrder}              
+              onChange={(e) => setForm((f) => ({ ...f, externalBuyerOrder: e.target.value }))}
             />
           </div>
 
@@ -687,7 +687,7 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     originAddress: string;
     buyerAddress: string;
     labelUrl?: string;
-    externalBuyerId: string;   // ← new
+    externalBuyerOrder: string;
     externalSellerId: string;
   }) {
     try {

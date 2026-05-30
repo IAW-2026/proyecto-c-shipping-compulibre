@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"; // adjust to your actual prisma client import
+import { prisma } from "@/lib/prisma";
 
 export type ShipmentStatus = "LABEL_CREATED" | "IN_TRANSIT" | "DELIVERED";
 
@@ -17,7 +17,7 @@ export async function fireShippingWebhooks(
 ): Promise<void> {
   const shipment = await prisma.shipment.findFirst({
     where: { externalSellerOrderId: sellerOrderId },
-    select: { externalBuyerId: true, externalSellerId: true },
+    select: { externalBuyerOrderId: true, externalSellerId: true },  // ← updated field name
   });
 
   if (!shipment) {
@@ -31,23 +31,24 @@ export async function fireShippingWebhooks(
   const calls: Promise<void>[] = [];
 
   // ── Buyer App ──────────────────────────────────────────────────────────────
-  // POST /api/orders/:sellerOrderId/shipping-webhook
+  // POST /api/orders/:buyerOrderId/shipping-webhook
   if (BUYER_APP_URL) {
-    const url = `${BUYER_APP_URL}/api/orders/${sellerOrderId}/shipping-webhook`;
-    const body = JSON.stringify({ ...payload, buyerId: shipment.externalBuyerId });
+    const buyerOrderId = shipment.externalBuyerOrderId;  // ← use as URL segment
+    const url = `${BUYER_APP_URL}/api/orders/${buyerOrderId}/shipping-webhook`;
+    const body = JSON.stringify(payload);  // ← no longer sending buyerId in body
     calls.push(
       fetch(url, { method: "POST", headers, body })
         .then(async (res) => {
           if (!res.ok) {
             const text = await res.text().catch(() => "(no body)");
             console.error(
-              `[webhook] Buyer App returned ${res.status} for seller order ${sellerOrderId}: ${text}`
+              `[webhook] Buyer App returned ${res.status} for buyer order ${buyerOrderId}: ${text}`
             );
           }
         })
         .catch((err) => {
           console.error(
-            `[webhook] Failed to reach Buyer App for seller order ${sellerOrderId}:`,
+            `[webhook] Failed to reach Buyer App for buyer order ${buyerOrderId}:`,
             err
           );
         })

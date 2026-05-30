@@ -30,14 +30,13 @@ export async function GET() {
 }
  
 // POST /api/shipments — create a new shipment (called by Payments App or admin)
-// POST /api/shipments — create a new shipment (called by Payments App or admin)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       sellerOrderId,
-      externalSellerId,  // ← renamed from sellerId
-      externalBuyerId,   // ← new
+      externalSellerId,
+      externalBuyerOrder,  // ← renamed from externalBuyerId
       buyerAddress,
       originAddress,
       courier,
@@ -70,8 +69,8 @@ export async function POST(req: NextRequest) {
         trackingId,
         externalTrackingId,
         externalSellerOrderId: sellerOrderId,
-        externalSellerId: externalSellerId ?? "",  // ← new
-        externalBuyerId: externalBuyerId ?? "",    // ← new
+        externalSellerId: externalSellerId ?? "",
+        externalBuyerOrderId: externalBuyerOrder ?? "",  // ← renamed
         courier,
         originAddress,
         destinationAddress: buyerAddress,
