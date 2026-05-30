@@ -28,6 +28,8 @@ model Shipment {
   trackingId            String          @id @map("tracking_id")
   externalTrackingId    String          @unique @map("external_tracking_id")
   externalSellerOrderId String          @map("external_seller_order_id")
+  externalBuyerId       String          @map("external_buyer_id") @default("")
+  externalSellerId      String          @map("external_seller_id") @default("")
   courier               String
   originAddress         String          @map("origin_address")
   destinationAddress    String          @map("destination_address")

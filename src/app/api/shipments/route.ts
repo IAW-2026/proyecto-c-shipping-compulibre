@@ -30,18 +30,20 @@ export async function GET() {
 }
  
 // POST /api/shipments — create a new shipment (called by Payments App or admin)
+// POST /api/shipments — create a new shipment (called by Payments App or admin)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       sellerOrderId,
-      sellerId,
+      externalSellerId,  // ← renamed from sellerId
+      externalBuyerId,   // ← new
       buyerAddress,
       originAddress,
       courier,
       externalTrackingId,
     } = body;
- 
+
     if (!sellerOrderId || !buyerAddress || !originAddress || !courier) {
       return NextResponse.json(
         {
@@ -51,26 +53,25 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
- 
+
     if (!externalTrackingId) {
       return NextResponse.json(
         { error: "Missing required field: externalTrackingId" },
         { status: 400 }
       );
     }
- 
-    // Accepted but unused — kept for compatibility with Payments App contract
-    void sellerId;
- 
+
     const trackingId = generateTrackingId();
     const generatedLabelUrl =
-    `https://proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
- 
+      `https://proyecto-c-shipping-compulibre.vercel.app/track/${encodeURIComponent(trackingId)}`;
+
     const shipment = await prisma.shipment.create({
       data: {
         trackingId,
         externalTrackingId,
         externalSellerOrderId: sellerOrderId,
+        externalSellerId: externalSellerId ?? "",  // ← new
+        externalBuyerId: externalBuyerId ?? "",    // ← new
         courier,
         originAddress,
         destinationAddress: buyerAddress,

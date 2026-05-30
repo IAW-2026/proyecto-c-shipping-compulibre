@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma"; // adjust to your actual prisma client import
+
 export type ShipmentStatus = "LABEL_CREATED" | "IN_TRANSIT" | "DELIVERED";
 
 export interface ShippingWebhookPayload {
@@ -13,15 +15,26 @@ export async function fireShippingWebhooks(
   sellerOrderId: string,
   payload: ShippingWebhookPayload
 ): Promise<void> {
-  const body = JSON.stringify(payload);
+  const shipment = await prisma.shipment.findFirst({
+    where: { externalSellerOrderId: sellerOrderId },
+    select: { externalBuyerId: true, externalSellerId: true },
+  });
+
+  if (!shipment) {
+    console.error(
+      `[webhook] No shipment found for seller order ${sellerOrderId} — aborting webhooks.`
+    );
+    return;
+  }
+
   const headers = { "Content-Type": "application/json" };
   const calls: Promise<void>[] = [];
 
   // ── Buyer App ──────────────────────────────────────────────────────────────
   // POST /api/orders/:sellerOrderId/shipping-webhook
   if (BUYER_APP_URL) {
-    const url = 
-    `${BUYER_APP_URL}/api/orders/${sellerOrderId}/shipping-webhook`;
+    const url = `${BUYER_APP_URL}/api/orders/${sellerOrderId}/shipping-webhook`;
+    const body = JSON.stringify({ ...payload, buyerId: shipment.externalBuyerId });
     calls.push(
       fetch(url, { method: "POST", headers, body })
         .then(async (res) => {
@@ -47,6 +60,7 @@ export async function fireShippingWebhooks(
   // POST /api/seller-orders/:sellerOrderId/shipping-webhook
   if (SELLER_APP_URL) {
     const url = `${SELLER_APP_URL}/api/seller-orders/${sellerOrderId}/shipping-webhook`;
+    const body = JSON.stringify({ ...payload, sellerId: shipment.externalSellerId });
     calls.push(
       fetch(url, { method: "POST", headers, body })
         .then(async (res) => {

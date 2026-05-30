@@ -379,6 +379,8 @@ function CreateModal({
     originAddress: string;
     buyerAddress: string;
     labelUrl?: string;
+    externalBuyerId: string;   // ← new
+    externalSellerId: string;  // ← new
   }) => void;
 }) {
   const [form, setForm] = useState({
@@ -388,6 +390,8 @@ function CreateModal({
     originAddress: "",
     buyerAddress: "",
     labelUrl: "",
+    externalBuyerId: "",
+    externalSellerId: "",
   });
   const [error, setError] = useState("");
 
@@ -409,6 +413,8 @@ function CreateModal({
       originAddress: form.originAddress.trim(),
       buyerAddress: form.buyerAddress.trim(),
       labelUrl: form.labelUrl.trim() || undefined,
+      externalBuyerId: form.externalBuyerId.trim(),   // ← new
+      externalSellerId: form.externalSellerId.trim(),  // ← new
     });
   }
 
@@ -530,6 +536,25 @@ function CreateModal({
               onChange={(e) => setForm((f) => ({ ...f, buyerAddress: e.target.value }))}
             />
           </div>
+          <div>
+            <label style={labelStyle}>Buyer ID</label>        
+            <input        
+              style={inputStyle}        
+              placeholder="buyer_123"       
+              value={form.externalBuyerId}        
+              onChange={(e) => setForm((f) => ({ ...f, externalBuyerId: e.target.value }))}
+            />
+          </div>
+
+<div>
+  <label style={labelStyle}>Seller ID</label>
+  <input
+    style={inputStyle}
+    placeholder="seller_456"
+    value={form.externalSellerId}
+    onChange={(e) => setForm((f) => ({ ...f, externalSellerId: e.target.value }))}
+  />
+</div>
 
           {error && (
             <p style={{ color: "#f87171", fontSize: 12, margin: 0 }}>{error}</p>
@@ -662,6 +687,8 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     originAddress: string;
     buyerAddress: string;
     labelUrl?: string;
+    externalBuyerId: string;   // ← new
+    externalSellerId: string;
   }) {
     try {
       const res = await fetch("/api/shipments", {
