@@ -47,12 +47,18 @@ export async function GET(
 // ── PATCH /api/shipments/[trackingId] ─────────────────────────────────────────
 // Advances the status one step forward only (LABEL_CREATED → IN_TRANSIT → DELIVERED).
 // Fires webhooks to Buyer App and Seller App after the DB update.
-//
 // Body: { location: string }
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ trackingId: string }> }
 ) {
+  // Auth: validate API key
+  const apiKey = req.headers.get("x-api-key");
+  const validKeys = [process.env.SHIPPING_API_KEY, process.env.COURIER_API_KEY].filter(Boolean);
+  if (!apiKey || !validKeys.includes(apiKey)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { trackingId } = await params;
   try {
     const body = await req.json();
@@ -102,8 +108,6 @@ export async function PATCH(
       include: { events: { orderBy: { timestamp: "asc" } } },
     });
 
-    // Fire webhooks to Buyer App and Seller App — non-blocking.
-    // Both apps are keyed by sellerOrderId (Buyer App knows it from the order flow).
     fireShippingWebhooks(updated.externalSellerOrderId, {
       trackingId: updated.trackingId,
       courier: updated.courier,

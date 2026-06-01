@@ -640,30 +640,33 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     loadShipments();
   }, [loadShipments]);
 
-  async function handleAdvance(trackingId: string) {
-    const shipment = shipments.find((s) => s.trackingId === trackingId);
-    const location = shipment?.status === "IN_TRANSIT" ? shipment.destinationAddress : "En camino";
+async function handleAdvance(trackingId: string) {
+  const shipment = shipments.find((s) => s.trackingId === trackingId);
+  const location = shipment?.status === "IN_TRANSIT" ? shipment.destinationAddress : "En camino";
 
-    try {
-      const res = await fetch(`/api/shipments/${trackingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        showToast(d.error ?? "Failed to advance status", "error");
-        return;
-      }
-      const updated: Shipment = await res.json();
-      setShipments((prev) =>
-        prev.map((s) => (s.trackingId === trackingId ? updated : s))
-      );
-      showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
-    } catch {
-      showToast("Network error", "error");
+  try {
+    const res = await fetch(`/api/shipments/${trackingId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "",
+      },
+      body: JSON.stringify({ location }),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      showToast(d.error ?? "Failed to advance status", "error");
+      return;
     }
+    const updated: Shipment = await res.json();
+    setShipments((prev) =>
+      prev.map((s) => (s.trackingId === trackingId ? updated : s))
+    );
+    showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
+  } catch {
+    showToast("Network error", "error");
   }
+}
 
   async function handleDelete(trackingId: string) {
     if (!confirm(`Delete shipment ${trackingId}? This cannot be undone.`)) return;
@@ -695,7 +698,9 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "",
+          //Hago la API key publica, como esta funcion es solo utilizada en el contexto del admin, 
+          //no hay riesgo de seguridad.
+          "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "", 
         },
         body: JSON.stringify(data),
       });

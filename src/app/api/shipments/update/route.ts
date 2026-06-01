@@ -6,8 +6,8 @@ const VALID_STATUSES = Object.values(ShipmentStatus);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, x-api-key",
 };
 
 /**
@@ -24,6 +24,16 @@ export async function OPTIONS() {
  * POST /api/shipments/update
  */
 export async function POST(req: NextRequest) {
+  // Auth: validate API key
+  const apiKey = req.headers.get("x-api-key");
+  const validKeys = [process.env.COURIER_API_KEY, process.env.SHIPPING_API_KEY].filter(Boolean);
+  if (!apiKey || !validKeys.includes(apiKey)) {
+    return NextResponse.json(
+      { error: "Unauthorized." },
+      { status: 401, headers: corsHeaders }
+    );
+  }
+
   try {
     const body = await req.json();
     const { externalTrackingId, status, location } = body;
