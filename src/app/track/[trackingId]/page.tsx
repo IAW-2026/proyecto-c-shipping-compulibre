@@ -59,7 +59,7 @@ export default function TrackingPage() {
     setShipment(null);
 
     try {
-      const res = await fetch(`/api/shipments/${encodeURIComponent(id.trim())}`);
+      const res = await fetch(`/api/track/${encodeURIComponent(id.trim())}`);
 
       if (res.status === 404) {
         setError('Envío no encontrado. Verificá el número de tracking.');
