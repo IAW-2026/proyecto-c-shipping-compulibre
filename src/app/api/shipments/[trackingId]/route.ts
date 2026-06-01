@@ -10,9 +10,16 @@ const NEXT_STATUS: Partial<Record<ShipmentStatus, ShipmentStatus>> = {
 // ── GET /api/shipments/[trackingId] ───────────────────────────────────────────
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ trackingId: string }> }
 ) {
+  // Auth: validate API key
+  const apiKey = req.headers.get("x-api-key");
+  const validKeys = [process.env.SELLER_API_KEY, process.env.BUYER_API_KEY].filter(Boolean);
+  if (!apiKey || !validKeys.includes(apiKey)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { trackingId } = await params;
   try {
     const shipment = await prisma.shipment.findUnique({
