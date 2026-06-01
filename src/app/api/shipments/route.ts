@@ -31,12 +31,19 @@ export async function GET() {
  
 // POST /api/shipments — create a new shipment (called by Payments App or admin)
 export async function POST(req: NextRequest) {
+  // Auth: validate API key
+  const apiKey = req.headers.get("x-api-key");
+  const validKeys = [process.env.SELLER_API_KEY, process.env.SHIPPING_API_KEY].filter(Boolean);
+  if (!apiKey || !validKeys.includes(apiKey)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const {
       sellerOrderId,
       externalSellerId,
-      externalBuyerOrder,  // ← renamed from externalBuyerId
+      externalBuyerOrder,
       buyerAddress,
       originAddress,
       courier,

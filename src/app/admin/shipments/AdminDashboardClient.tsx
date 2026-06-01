@@ -693,9 +693,13 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     try {
       const res = await fetch("/api/shipments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "",
+        },
         body: JSON.stringify(data),
       });
+
       if (!res.ok) {
         const d = await res.json();
         showToast(d.error ?? "Failed to create", "error");
