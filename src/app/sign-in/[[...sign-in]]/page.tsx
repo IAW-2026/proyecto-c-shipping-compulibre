@@ -1,7 +1,8 @@
-import { SignIn } from "@clerk/nextjs";
+import { Suspense } from "react";
+import AdminSignInForm from "./AdminSignInForm";
 
 /**
- * Clerk's hosted sign-in UI mounted at /sign-in.
+ * Clerk sign-in UI mounted at /sign-in.
  * The [[...sign-in]] catch-all is required by Clerk's routing.
  *
  * Appearance is customised to match the dark CompuLibre theme.
@@ -46,31 +47,9 @@ export default function SignInPage() {
         </div>
       </div>
 
-      <SignIn
-        routing="path"
-        path="/sign-in"
-        signUpUrl={undefined}          // disable self-registration
-        fallbackRedirectUrl="/admin/shipments"
-        appearance={{
-          variables: {
-            colorPrimary: "#3b82f6",
-            colorBackground: "#0d1929",
-            colorInputBackground: "#0f172a",
-            colorInputText: "#f8fafc",
-            colorText: "#f8fafc",
-            colorTextSecondary: "#94a3b8",
-            colorNeutral: "#334155",
-            borderRadius: "10px",
-          },
-          elements: {
-            card: {
-              border: "1px solid #1e293b",
-              boxShadow: "0 24px 64px #00000088",
-            },
-            footerAction: { display: "none" }, // hides "Don't have an account? Sign up"
-          },
-        }}
-      />
+      <Suspense fallback={null}>
+        <AdminSignInForm />
+      </Suspense>
     </div>
   );
 }

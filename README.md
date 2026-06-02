@@ -8,3 +8,5 @@ Esta app corresponde al módulo de envíos y logística en el proyecto de tipo *
 ---
 
 Enunciado completo: <https://iaw-2026.github.io/proyecto/>
+
+Documentacion: [Ver documentación](documentacion.md)

@@ -11,15 +11,19 @@
 > ## 2. Usuarios disponibles para utilizar o evaluar la aplicación
 
 - **Usuario normal:**
+    - correo: usuario+clerk_test@iaw.com
+    - password: iawuser#
+    - codigo: 424242
 
 - **Usuario administrador:**
+    - correo: administrador+clerk_test@iaw.com
+    - password: iawuser#
+    - codigo: 424242
 
     *Aclaración: el usuario normal no es requerido para el uso de la aplicación normal, solo se utiliza para testear que no puede acceder al panel de administradores por falta de permisos*
 
 **Login del panel de administradores**
 - `https://proyecto-c-shipping-compulibre.vercel.app/sign-in`
-
-  **No se utiliza una contraseña, solo con ingresar el codigo que es enviado al email es suficiente**
 
 
 ---
@@ -62,5 +66,4 @@ Por su parte, tambien permite a los administradores intervenir en caso de que ha
     - **COURIER_API_KEY=** 8d7c7f1f0f6b1c4e6a2e9b7d3c8f5a1e4d9c2b6f7a8e1c3d5f9b2a7e6c4d8f1
 
 - La seguridad de los endpoints no esta implementada por completo, si bien la mayoria estan protegidos, incluidos todos aquellos endpoints que son consultados por otras apps (Buyer, Seller, Courier), hay algunos que por constricciones de tiempo no puedieron ser implementados aun.
-- Al pedir todos los shipments para el dashboard del admin, hago la request desde el front end, exponiendo la SHIPPING_API_KEY en el proceso, sin embargo, lo considere aceptable ya que a la unica persona a la KEY quedaria expuesto es al propio administrador, no es posible que un usuario comun acceda a ella.
-- Como se mencionó anteriormente, para ingresar al panel de admin no es necesario la contraseña, solo ingresar el codigo enviado el email, en caso de no ser una alternativa valida, se cambiara para la proxima entrega.
+- Al pedir todos los shipments para el dashboard del admin, hago la request desde el front end, exponiendo la SHIPPING_API_KEY en el proceso, sin embargo, lo considere aceptable ya que a la unica persona a la KEY quedaria expuesto es al propio administrador, no es posible que un usuario comun acceda a ella.ç
