@@ -91,25 +91,25 @@ export default function AdminSignInForm() {
   );
 
   useEffect(() => {
-    if (!auth.isLoaded || !auth.isSignedIn) {
-      return;
-    }
+  if (!auth.isLoaded || !auth.isSignedIn) {
+    return;
+  }
 
-    const roles =
-      auth.sessionClaims?.metadata as
-        | { role?: string; roles?: string[] }
-        | undefined;
+  const roles =
+    auth.sessionClaims?.metadata as
+      | { role?: string; roles?: string[] }
+      | undefined;
 
-    const isAdmin =
-      roles?.roles?.includes("admin") ||
-      roles?.role === "admin";
+  const isAdmin =
+    roles?.roles?.includes("admin") ||
+    roles?.role === "admin";
 
-    if (isAdmin) {
-      router.replace(redirectUrl);
-      return;
-    }
+  if (isAdmin) {
+    router.replace(redirectUrl);
+    return;
+  }
 
-    auth.signOut({ redirectUrl: "/sign-in" });
+  router.replace("/unauthorized");
   }, [auth, redirectUrl, router]);
 
   async function activateCompletedSignIn(sessionId: string) {
