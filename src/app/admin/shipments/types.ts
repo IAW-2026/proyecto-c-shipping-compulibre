@@ -21,3 +21,23 @@ export interface Shipment {
   updatedAt: string;
   events: ShipmentEvent[];
 }
+
+export interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface StatusCounts {
+  ALL: number;
+  LABEL_CREATED: number;
+  IN_TRANSIT: number;
+  DELIVERED: number;
+}
+
+export interface ShipmentsResponse {
+  shipments: Shipment[];
+  pagination: Pagination;
+  counts: StatusCounts;
+}

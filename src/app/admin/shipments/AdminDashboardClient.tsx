@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 
-import type { Shipment, ShipmentStatus } from "./types";
+import type { Shipment, ShipmentStatus, Pagination, StatusCounts } from "./types";
 import { STATUS_LABELS } from "./constants";
 import { ShipmentRow } from "./ShipmentRow";
 import { CreateModal, type CreateShipmentData } from "./CreateModal";
@@ -13,65 +13,162 @@ import "./dashboard.css";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ToastType = "success" | "error" | "warning";
+interface Toast { msg: string; type: ToastType; }
 
-interface Toast {
-  msg: string;
-  type: ToastType;
+const EMPTY_COUNTS: StatusCounts = { ALL: 0, LABEL_CREATED: 0, IN_TRANSIT: 0, DELIVERED: 0 };
+
+// ─── Pagination bar ───────────────────────────────────────────────────────────
+
+function PaginationBar({
+  pagination,
+  onPage,
+}: {
+  pagination: Pagination;
+  onPage: (p: number) => void;
+}) {
+  const { page, totalPages, total, pageSize } = pagination;
+  if (totalPages <= 1) return null;
+
+  const from = (page - 1) * pageSize + 1;
+  const to   = Math.min(page * pageSize, total);
+
+  // Build page number buttons: always show first, last, current ±1, with ellipsis
+  const pages: (number | "…")[] = [];
+  const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+
+  add(1);
+  if (page > 3) pages.push("…");
+  if (page > 2) add(page - 1);
+  add(page);
+  if (page < totalPages - 1) add(page + 1);
+  if (page < totalPages - 2) pages.push("…");
+  add(totalPages);
+
+  return (
+    <div className="pagination">
+      <span className="pagination-info">
+        {from}–{to} of {total}
+      </span>
+      <div className="pagination-controls">
+        <button
+          className="pagination-btn"
+          disabled={page === 1}
+          onClick={() => onPage(page - 1)}
+        >
+          ←
+        </button>
+
+        {pages.map((p, i) =>
+          p === "…" ? (
+            <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+          ) : (
+            <button
+              key={p}
+              className={`pagination-btn${p === page ? " pagination-btn--active" : ""}`}
+              onClick={() => onPage(p as number)}
+            >
+              {p}
+            </button>
+          )
+        )}
+
+        <button
+          className="pagination-btn"
+          disabled={page === totalPages}
+          onClick={() => onPage(page + 1)}
+        >
+          →
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AdminDashboardClient({
-  displayName,
-}: {
-  displayName: string;
-}) {
+export default function AdminDashboardClient({ displayName }: { displayName: string }) {
   const { signOut } = useAuth();
 
-  // Sync AdminProfile row on first login (per 05-usuarios.md)
   useEffect(() => {
     fetch("/api/admin/sync-profile", { method: "POST" }).catch(() => {});
   }, []);
 
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [shipments, setShipments]   = useState<Shipment[]>([]);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 10, total: 0, totalPages: 0 });
+  const [counts, setCounts]         = useState<StatusCounts>(EMPTY_COUNTS);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [filter, setFilter] = useState<ShipmentStatus | "ALL">("ALL");
-  const [search, setSearch] = useState("");
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [filter, setFilter]         = useState<ShipmentStatus | "ALL">("ALL");
+  const [search, setSearch]         = useState("");
+  const [page, setPage]             = useState(1);
+  const [toast, setToast]           = useState<Toast | null>(null);
+
+  // Debounce search so we don't fire on every keystroke
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function showToast(msg: string, type: ToastType = "success") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   }
 
-  const loadShipments = useCallback(async () => {
+  const loadShipments = useCallback(async (options?: { page?: number; status?: ShipmentStatus | "ALL"; q?: string }) => {
+    const p      = options?.page   ?? page;
+    const status = options?.status ?? filter;
+    const q      = options?.q      ?? search;
+
     try {
       setLoading(true);
-      const res = await fetch("/api/shipments");
+      const params = new URLSearchParams({ page: String(p) });
+      if (status !== "ALL") params.set("status", status);
+      if (q) params.set("q", q);
+
+      const res = await fetch(`/api/shipments?${params}`);
       if (!res.ok) throw new Error("Failed to load");
-      setShipments(await res.json());
+      const data = await res.json();
+
+      setShipments(data.shipments);
+      setPagination(data.pagination);
+      setCounts(data.counts);
     } catch {
       setError("Could not load shipments. Check your database connection.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filter, search]);
 
-  useEffect(() => {
-    loadShipments();
-  }, [loadShipments]);
+  // Initial load
+  useEffect(() => { loadShipments(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload when page changes
+  useEffect(() => { loadShipments({ page }); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleFilterChange(f: ShipmentStatus | "ALL") {
+    setFilter(f);
+    setPage(1);
+    loadShipments({ page: 1, status: f });
+  }
+
+  function handleSearchChange(q: string) {
+    setSearch(q);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1);
+      loadShipments({ page: 1, q });
+    }, 350);
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    // loadShipments fires via the page useEffect above
+  }
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   async function handleAdvance(trackingId: string) {
     const shipment = shipments.find((s) => s.trackingId === trackingId);
-    const location =
-      shipment?.status === "IN_TRANSIT"
-        ? shipment.destinationAddress
-        : "En camino";
+    const location = shipment?.status === "IN_TRANSIT" ? shipment.destinationAddress : "En camino";
 
     try {
       const res = await fetch(`/api/shipments/${trackingId}`, {
@@ -90,10 +187,10 @@ export default function AdminDashboardClient({
       }
 
       const updated: Shipment = await res.json();
-      setShipments((prev) =>
-        prev.map((s) => (s.trackingId === trackingId ? updated : s))
-      );
+      setShipments((prev) => prev.map((s) => (s.trackingId === trackingId ? updated : s)));
       showToast(`Status advanced → ${STATUS_LABELS[updated.status]}`);
+      // Refresh counts (a status changed)
+      loadShipments({ page });
     } catch {
       showToast("Network error", "error");
     }
@@ -102,15 +199,14 @@ export default function AdminDashboardClient({
   async function handleDelete(trackingId: string) {
     if (!confirm(`Delete shipment ${trackingId}? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`/api/shipments/${trackingId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        showToast("Failed to delete shipment", "error");
-        return;
-      }
-      setShipments((prev) => prev.filter((s) => s.trackingId !== trackingId));
+      const res = await fetch(`/api/shipments/${trackingId}`, { method: "DELETE" });
+      if (!res.ok) { showToast("Failed to delete shipment", "error"); return; }
+
       showToast(`Shipment ${trackingId} deleted`);
+      // If we just deleted the last item on this page, go back one
+      const newPage = shipments.length === 1 && page > 1 ? page - 1 : page;
+      setPage(newPage);
+      loadShipments({ page: newPage });
     } catch {
       showToast("Network error", "error");
     }
@@ -122,7 +218,6 @@ export default function AdminDashboardClient({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // API key is public — this function is only used in the admin context.
           "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "",
         },
         body: JSON.stringify(data),
@@ -141,39 +236,21 @@ export default function AdminDashboardClient({
       } else {
         showToast("Shipment created successfully");
       }
-      await loadShipments();
+      // New shipments land on page 1 (newest first)
+      setPage(1);
+      loadShipments({ page: 1 });
     } catch {
       showToast("Network error", "error");
     }
   }
 
-  // ─── Derived data ───────────────────────────────────────────────────────────
-
-  const filtered = shipments.filter((s) => {
-    const matchStatus = filter === "ALL" || s.status === filter;
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      s.trackingId.toLowerCase().includes(q) ||
-      s.externalTrackingId.toLowerCase().includes(q) ||
-      s.externalSellerOrderId.toLowerCase().includes(q) ||
-      s.courier.toLowerCase().includes(q) ||
-      s.destinationAddress.toLowerCase().includes(q);
-    return matchStatus && matchSearch;
-  });
-
-  const counts = {
-    ALL: shipments.length,
-    LABEL_CREATED: shipments.filter((s) => s.status === "LABEL_CREATED").length,
-    IN_TRANSIT: shipments.filter((s) => s.status === "IN_TRANSIT").length,
-    DELIVERED: shipments.filter((s) => s.status === "DELIVERED").length,
-  };
+  // ─── Derived ────────────────────────────────────────────────────────────────
 
   const STAT_TABS = [
-    { key: "ALL" as const, label: "All Shipments", color: "#f8fafc" },
+    { key: "ALL"           as const, label: "All Shipments",            color: "#f8fafc" },
     { key: "LABEL_CREATED" as const, label: STATUS_LABELS.LABEL_CREATED, color: "#f59e0b" },
-    { key: "IN_TRANSIT" as const, label: STATUS_LABELS.IN_TRANSIT, color: "#3b82f6" },
-    { key: "DELIVERED" as const, label: STATUS_LABELS.DELIVERED, color: "#10b981" },
+    { key: "IN_TRANSIT"    as const, label: STATUS_LABELS.IN_TRANSIT,    color: "#3b82f6" },
+    { key: "DELIVERED"     as const, label: STATUS_LABELS.DELIVERED,     color: "#10b981" },
   ];
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -190,16 +267,12 @@ export default function AdminDashboardClient({
               <div className="header-brand-sub">Shipping Admin</div>
             </div>
           </div>
-
           <div className="header-actions">
             <div className="user-pill">
               <div className="user-pill-dot" />
               {displayName.toUpperCase()}
             </div>
-            <button
-              className="btn-signout"
-              onClick={() => signOut({ redirectUrl: "/sign-in" })}
-            >
+            <button className="btn-signout" onClick={() => signOut({ redirectUrl: "/sign-in" })}>
               SIGN OUT
             </button>
           </div>
@@ -214,11 +287,9 @@ export default function AdminDashboardClient({
             <button
               key={key}
               className={`stat-card${filter === key ? " active" : ""}`}
-              onClick={() => setFilter(key)}
+              onClick={() => handleFilterChange(key)}
             >
-              <div className="stat-number" style={{ color }}>
-                {counts[key]}
-              </div>
+              <div className="stat-number" style={{ color }}>{counts[key]}</div>
               <div className="stat-label">{label}</div>
             </button>
           ))}
@@ -230,12 +301,12 @@ export default function AdminDashboardClient({
             className="search-input"
             placeholder="Search tracking ID, courier ID, order, courier, address…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
           <button className="btn-new" onClick={() => setShowCreate(true)}>
             + New Shipment
           </button>
-          <button className="btn-refresh" onClick={loadShipments} title="Refresh">
+          <button className="btn-refresh" onClick={() => loadShipments({ page })} title="Refresh">
             ↺
           </button>
         </div>
@@ -248,42 +319,37 @@ export default function AdminDashboardClient({
           </div>
         ) : error ? (
           <div className="state-error">{error}</div>
-        ) : filtered.length === 0 ? (
+        ) : shipments.length === 0 ? (
           <div className="state-empty">
             <div className="state-empty-icon">📭</div>
             <div className="state-empty-text">
-              {shipments.length === 0
+              {counts.ALL === 0
                 ? "No shipments yet. Create one to get started."
                 : "No shipments match your search or filter."}
             </div>
           </div>
         ) : (
-          <div>
-            {filtered.map((s) => (
-              <ShipmentRow
-                key={s.trackingId}
-                shipment={s}
-                onAdvance={handleAdvance}
-                onDelete={handleDelete}
-                onExpand={(id) =>
-                  setExpandedId((prev) => (prev === id ? null : id))
-                }
-                expanded={expandedId === s.trackingId}
-              />
-            ))}
-          </div>
+          <>
+            <div>
+              {shipments.map((s) => (
+                <ShipmentRow
+                  key={s.trackingId}
+                  shipment={s}
+                  onAdvance={handleAdvance}
+                  onDelete={handleDelete}
+                  onExpand={(id) => setExpandedId((prev) => (prev === id ? null : id))}
+                  expanded={expandedId === s.trackingId}
+                />
+              ))}
+            </div>
+            <PaginationBar pagination={pagination} onPage={handlePageChange} />
+          </>
         )}
       </div>
 
-      {/* Create modal */}
-      {showCreate && (
-        <CreateModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />
-      )}
+      {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
 
-      {/* Toast */}
-      {toast && (
-        <div className={`toast toast--${toast.type}`}>{toast.msg}</div>
-      )}
+      {toast && <div className={`toast toast--${toast.type}`}>{toast.msg}</div>}
     </div>
   );
 }
