@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       shipments,
       pagination: {
         page,
-        pageSize: PAGE_SIZE,
+        limit: PAGE_SIZE,
         total,
         totalPages: Math.ceil(total / PAGE_SIZE),
       },
