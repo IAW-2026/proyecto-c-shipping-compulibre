@@ -15,7 +15,7 @@ export async function GET(
 ) {
   // Auth: validate API key
   const apiKey = req.headers.get("x-api-key");
-  const validKeys = [process.env.SELLER_API_KEY, process.env.BUYER_API_KEY].filter(Boolean);
+  const validKeys = [process.env.SELLER_API_KEY, process.env.BUYER_API_KEY, process.env.SUPERADMIN_API_KEY].filter(Boolean);
   if (!apiKey || !validKeys.includes(apiKey)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -54,7 +54,7 @@ export async function PATCH(
 ) {
   // Auth: validate API key
   const apiKey = req.headers.get("x-api-key");
-  const validKeys = [process.env.SHIPPING_API_KEY, process.env.COURIER_API_KEY].filter(Boolean);
+  const validKeys = [process.env.SHIPPING_API_KEY, process.env.COURIER_API_KEY, process.env.SUPERADMIN_API_KEY].filter(Boolean);
   if (!apiKey || !validKeys.includes(apiKey)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -127,9 +127,18 @@ export async function PATCH(
 // ── DELETE /api/shipments/[trackingId] ────────────────────────────────────────
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ trackingId: string }> }
-) {
+  ) {
+  const apiKey = req.headers.get("x-api-key");
+  const validKeys = [
+    process.env.SHIPPING_API_KEY,
+    process.env.SUPERADMIN_API_KEY,
+  ].filter(Boolean);
+  if (!apiKey || !validKeys.includes(apiKey)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { trackingId } = await params;
   try {
     const existing = await prisma.shipment.findUnique({

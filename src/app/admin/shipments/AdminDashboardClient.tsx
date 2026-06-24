@@ -199,21 +199,25 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
     }
   }
 
-  async function handleDelete(trackingId: string) {
-    if (!confirm(`Delete shipment ${trackingId}? This cannot be undone.`)) return;
-    try {
-      const res = await fetch(`/api/shipments/${trackingId}`, { method: "DELETE" });
-      if (!res.ok) { showToast("Failed to delete shipment", "error"); return; }
+async function handleDelete(trackingId: string) {
+  if (!confirm(`Delete shipment ${trackingId}? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/api/shipments/${trackingId}`, {
+      method: "DELETE",
+      headers: {
+        "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "",
+      },
+    });
+    if (!res.ok) { showToast("Failed to delete shipment", "error"); return; }
 
-      showToast(`Shipment ${trackingId} deleted`);
-      // If we just deleted the last item on this page, go back one
-      const newPage = shipments.length === 1 && page > 1 ? page - 1 : page;
-      setPage(newPage);
-      loadShipments({ page: newPage });
-    } catch {
-      showToast("Network error", "error");
-    }
+    showToast(`Shipment ${trackingId} deleted`);
+    const newPage = shipments.length === 1 && page > 1 ? page - 1 : page;
+    setPage(newPage);
+    loadShipments({ page: newPage });
+  } catch {
+    showToast("Network error", "error");
   }
+}
 
   async function handleCreate(data: CreateShipmentData) {
     try {
