@@ -26,13 +26,12 @@ function PaginationBar({
   pagination: Pagination;
   onPage: (p: number) => void;
 }) {
-  const { page, totalPages, total, pageSize } = pagination;
+  const { page, limit, totalPages, total } = pagination;
   if (totalPages <= 1) return null;
 
-  const from = (page - 1) * pageSize + 1;
-  const to   = Math.min(page * pageSize, total);
+  const from = (page - 1) * limit + 1;
+  const to   = Math.min(page * limit, total);
 
-  // Build page number buttons: always show first, last, current ±1, with ellipsis
   const pages: (number | "…")[] = [];
   const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
 
@@ -94,7 +93,7 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
   }, []);
 
   const [shipments, setShipments]   = useState<Shipment[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 10, total: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [counts, setCounts]         = useState<StatusCounts>(EMPTY_COUNTS);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState("");
@@ -124,7 +123,11 @@ export default function AdminDashboardClient({ displayName }: { displayName: str
       if (status !== "ALL") params.set("status", status);
       if (q) params.set("q", q);
 
-      const res = await fetch(`/api/shipments?${params}`);
+      const res = await fetch(`/api/shipments?${params}`, {
+        headers: {
+          "x-api-key": process.env.NEXT_PUBLIC_SHIPPING_API_KEY ?? "",
+        },
+      });
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
 
