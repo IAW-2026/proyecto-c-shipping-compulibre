@@ -24,7 +24,7 @@ export interface Shipment {
 
 export interface Pagination {
   page: number;
-  pageSize: number;
+  limit: number;
   total: number;
   totalPages: number;
 }

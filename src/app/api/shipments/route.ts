@@ -11,11 +11,21 @@ function generateTrackingId(): string {
 
 // GET /api/shipments?page=1&status=IN_TRANSIT&q=TRK-COMPU
 export async function GET(req: NextRequest) {
+  const apiKey = req.headers.get("x-api-key");
+  const validKeys = [
+    process.env.SHIPPING_API_KEY,
+    process.env.SUPERADMIN_API_KEY,
+  ].filter(Boolean);
+  if (!apiKey || !validKeys.includes(apiKey)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const { searchParams } = req.nextUrl;
     const page   = Math.max(1, parseInt(searchParams.get("page")  ?? "1", 10));
     const status = searchParams.get("status") as ShipmentStatus | null;
     const q      = searchParams.get("q")?.trim() ?? "";
+    
 
     // Build the where clause
     const where: Prisma.ShipmentWhereInput = {};
