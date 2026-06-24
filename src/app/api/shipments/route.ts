@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   // Auth: validate API key
   const apiKey = req.headers.get("x-api-key");
-  const validKeys = [process.env.SELLER_API_KEY, process.env.SHIPPING_API_KEY].filter(Boolean);
+  const validKeys = [process.env.SELLER_API_KEY, process.env.SHIPPING_API_KEY, process.env.SUPERADMIN_API_KEY].filter(Boolean);
   if (!apiKey || !validKeys.includes(apiKey)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
