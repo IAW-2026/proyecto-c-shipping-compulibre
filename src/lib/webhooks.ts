@@ -8,16 +8,17 @@ export interface ShippingWebhookPayload {
   status: ShipmentStatus;
 }
 
-const BUYER_APP_URL = process.env.BUYER_APP_URL?.replace(/\/$/, "") ?? "";
+const BUYER_APP_URL  = process.env.BUYER_APP_URL?.replace(/\/$/, "")  ?? "";
 const SELLER_APP_URL = process.env.SELLER_APP_URL?.replace(/\/$/, "") ?? "";
+const SHIPPING_KEY   = process.env.SHIPPING_API_KEY                   ?? "";
 
 export async function fireShippingWebhooks(
   sellerOrderId: string,
   payload: ShippingWebhookPayload
 ): Promise<void> {
   const shipment = await prisma.shipment.findFirst({
-    where: { externalSellerOrderId: sellerOrderId },
-    select: { externalBuyerOrderId: true, externalSellerId: true },  // ← updated field name
+    where:  { externalSellerOrderId: sellerOrderId },
+    select: { externalBuyerOrderId: true, externalSellerId: true },
   });
 
   if (!shipment) {
@@ -27,15 +28,18 @@ export async function fireShippingWebhooks(
     return;
   }
 
-  const headers = { "Content-Type": "application/json" };
+  const headers = {
+    "Content-Type": "application/json",
+    "x-api-key":    SHIPPING_KEY,
+  };
+
   const calls: Promise<void>[] = [];
 
   // ── Buyer App ──────────────────────────────────────────────────────────────
-  // POST /api/orders/:buyerOrderId/shipping-webhook
   if (BUYER_APP_URL) {
-    const buyerOrderId = shipment.externalBuyerOrderId;  // ← use as URL segment
-    const url = `${BUYER_APP_URL}/api/orders/${buyerOrderId}/shipping-webhook`;
-    const body = JSON.stringify(payload);  // ← no longer sending buyerId in body
+    const buyerOrderId = shipment.externalBuyerOrderId;
+    const url  = `${BUYER_APP_URL}/api/orders/${buyerOrderId}/shipping-webhook`;
+    const body = JSON.stringify(payload);
     calls.push(
       fetch(url, { method: "POST", headers, body })
         .then(async (res) => {
@@ -58,9 +62,8 @@ export async function fireShippingWebhooks(
   }
 
   // ── Seller App ─────────────────────────────────────────────────────────────
-  // POST /api/seller-orders/:sellerOrderId/shipping-webhook
   if (SELLER_APP_URL) {
-    const url = `${SELLER_APP_URL}/api/seller-orders/${sellerOrderId}/shipping-webhook`;
+    const url  = `${SELLER_APP_URL}/api/seller-orders/${sellerOrderId}/shipping-webhook`;
     const body = JSON.stringify({ ...payload, sellerId: shipment.externalSellerId });
     calls.push(
       fetch(url, { method: "POST", headers, body })
